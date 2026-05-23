@@ -47,7 +47,7 @@
     <!-- Sidebar / Bảng điều khiển -->
     <aside class="w-full md:w-80 lg:w-96 bg-white shadow-lg z-10 flex flex-col h-auto md:h-full shrink-0">
         <!-- Header -->
-        <div class="p-5 border-b border-gray-100 bg-blue-600 text-white rounded-b-xl md:rounded-none">
+        <div class="p-5 border-b border-gray-100 bg-blue-600 text-white md:rounded-none">
             <h1 class="text-xl font-bold flex items-center gap-2">
                 <i class="ph-fill ph-graduation-cap text-2xl"></i>
                 Hỗ Trợ Thi THPT
@@ -59,9 +59,18 @@
             </div>
         </div>
 
-        <!-- Controls -->
-        <div class="p-5 flex-1 overflow-y-auto no-scrollbar flex flex-col gap-5">
+        <!-- Chuyển đổi Tab: Bản đồ / Sơ đồ phòng -->
+        <div class="flex border-b border-gray-200 bg-white shrink-0">
+            <button id="tab-btn-map" onclick="switchTab('map')" class="flex-1 py-3.5 text-sm font-semibold text-blue-600 border-b-2 border-blue-600 bg-blue-50/30 transition-all">
+                <i class="ph-fill ph-map-pin text-lg align-text-bottom mr-1"></i> Bản đồ
+            </button>
+            <button id="tab-btn-schema" onclick="switchTab('schema')" class="flex-1 py-3.5 text-sm font-semibold text-gray-500 border-b-2 border-transparent hover:text-blue-600 hover:bg-gray-50 transition-all">
+                <i class="ph-fill ph-buildings text-lg align-text-bottom mr-1"></i> Sơ đồ phòng
+            </button>
+        </div>
 
+        <!-- CÁC ĐIỀU KHIỂN CHO BẢN ĐỒ -->
+        <div id="map-controls" class="p-5 flex-1 overflow-y-auto no-scrollbar flex flex-col gap-5">
             <!-- Vị trí của tôi -->
             <div class="bg-blue-50 p-4 rounded-xl border border-blue-100">
                 <h3 class="font-semibold text-gray-800 mb-3 flex items-center gap-2">
@@ -73,7 +82,7 @@
                 <p id="locationStatus" class="text-xs font-medium mt-2 hidden"></p>
             </div>
 
-            <!-- Bộ lọc (Ban đầu sẽ ẩn, chỉ hiện khi đã tải dữ liệu thành công) -->
+            <!-- Bộ lọc -->
             <div id="filterSection" class="opacity-50 pointer-events-none transition-all duration-300">
                 <h3 class="font-semibold text-gray-800 mb-3 flex items-center gap-2">
                     <i class="ph-fill ph-funnel text-orange-500"></i> Hiển thị trên bản đồ
@@ -111,17 +120,226 @@
                 </div>
             </div>
         </div>
+
+        <!-- CÁC ĐIỀU KHIỂN CHO SƠ ĐỒ PHÒNG -->
+        <div id="schema-controls" class="hidden p-5 flex-1 overflow-y-auto no-scrollbar flex flex-col gap-5">
+            <div class="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
+                <h3 class="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                    <i class="ph-fill ph-layers text-indigo-600"></i> Lọc danh sách tầng
+                </h3>
+                <div class="flex flex-col gap-2">
+                    <button onclick="filterFloor('all')" id="btn-floor-all" class="floor-btn w-full bg-indigo-600 text-white font-medium py-2 rounded-lg shadow-sm transition-colors border border-indigo-600">Tất cả các tầng</button>
+                    <button onclick="filterFloor('1')" id="btn-floor-1" class="floor-btn w-full bg-white text-gray-700 hover:bg-indigo-50 font-medium py-2 rounded-lg border border-gray-200 transition-colors">Tầng 1</button>
+                    <button onclick="filterFloor('2')" id="btn-floor-2" class="floor-btn w-full bg-white text-gray-700 hover:bg-indigo-50 font-medium py-2 rounded-lg border border-gray-200 transition-colors">Tầng 2</button>
+                    <button onclick="filterFloor('3')" id="btn-floor-3" class="floor-btn w-full bg-white text-gray-700 hover:bg-indigo-50 font-medium py-2 rounded-lg border border-gray-200 transition-colors">Tầng 3</button>
+                </div>
+            </div>
+            <div class="text-xs text-gray-600 leading-relaxed bg-yellow-50 p-3 rounded-lg border border-yellow-200">
+                <i class="ph-fill ph-lightbulb text-yellow-500 text-sm"></i> Mẹo: Hãy chọn tầng mà số báo danh của bạn được phân bổ để ẩn đi các phòng không liên quan, giúp việc tìm kiếm dễ dàng hơn.
+            </div>
+        </div>
+
     </aside>
 
-    <!-- Khu vực Bản đồ -->
-    <main class="flex-1 p-2 md:p-4 bg-gray-200 relative">
-        <div id="map" class="bg-white shadow-inner">
+    <!-- Khu vực Hiển thị chính (Bản đồ / Sơ đồ phòng) -->
+    <main class="flex-1 bg-gray-200 relative overflow-hidden flex flex-col">
+        
+        <!-- BẢN ĐỒ -->
+        <div id="map" class="h-full w-full bg-white shadow-inner">
             <!-- Bản đồ Leaflet sẽ được vẽ vào đây -->
+        </div>
+
+        <!-- SƠ ĐỒ PHÒNG (Mô phỏng ảnh chụp) -->
+        <div id="schema-view" class="hidden h-full w-full bg-gray-100 overflow-y-auto p-4 md:p-8 flex flex-col items-center">
+            <h2 class="text-2xl font-black text-gray-800 mb-8 text-center drop-shadow-sm uppercase">Sơ đồ phòng thi vào lớp 10</h2>
+            
+            <div class="relative w-full max-w-4xl bg-white p-4 md:p-8 rounded-2xl shadow-md border border-gray-200 flex flex-col gap-6">
+                
+                <!-- DÃY A3 -->
+                <div class="building-block w-full transition-all duration-300">
+                    <h3 class="text-center font-bold text-gray-700 bg-gray-200 py-1.5 rounded-t border border-gray-300 tracking-wide">DÃY A3</h3>
+                    <div class="grid grid-cols-3 md:grid-cols-6 gap-3 p-4 border border-t-0 border-gray-300 rounded-b bg-gray-50">
+                        <div class="room-item bg-blue-50 text-blue-700 py-2 px-1 rounded flex flex-col items-center justify-center border border-blue-200 shadow-sm" data-floor="3"><span class="font-bold text-lg leading-none">P01</span><span class="text-[10px] text-gray-500 mt-1 font-medium">Tầng 3</span></div>
+                        <div class="room-item bg-blue-50 text-blue-700 py-2 px-1 rounded flex flex-col items-center justify-center border border-blue-200 shadow-sm" data-floor="3"><span class="font-bold text-lg leading-none">P02</span><span class="text-[10px] text-gray-500 mt-1 font-medium">Tầng 3</span></div>
+                        <div class="room-item bg-blue-50 text-blue-700 py-2 px-1 rounded flex flex-col items-center justify-center border border-blue-200 shadow-sm" data-floor="3"><span class="font-bold text-lg leading-none">P03</span><span class="text-[10px] text-gray-500 mt-1 font-medium">Tầng 3</span></div>
+                        <div class="room-item bg-blue-50 text-blue-700 py-2 px-1 rounded flex flex-col items-center justify-center border border-blue-200 shadow-sm" data-floor="3"><span class="font-bold text-lg leading-none">P04</span><span class="text-[10px] text-gray-500 mt-1 font-medium">Tầng 3</span></div>
+                        <div class="room-item bg-blue-50 text-blue-700 py-2 px-1 rounded flex flex-col items-center justify-center border border-blue-200 shadow-sm" data-floor="3"><span class="font-bold text-lg leading-none">P05</span><span class="text-[10px] text-gray-500 mt-1 font-medium">Tầng 3</span></div>
+                        <div class="room-item bg-blue-50 text-blue-700 py-2 px-1 rounded flex flex-col items-center justify-center border border-blue-200 shadow-sm" data-floor="3"><span class="font-bold text-lg leading-none">P06</span><span class="text-[10px] text-gray-500 mt-1 font-medium">Tầng 3</span></div>
+
+                        <div class="room-item bg-green-50 text-green-700 py-2 px-1 rounded flex flex-col items-center justify-center border border-green-200 shadow-sm" data-floor="2"><span class="font-bold text-lg leading-none">P19</span><span class="text-[10px] text-gray-500 mt-1 font-medium">Tầng 2</span></div>
+                        <div class="room-item bg-green-50 text-green-700 py-2 px-1 rounded flex flex-col items-center justify-center border border-green-200 shadow-sm" data-floor="2"><span class="font-bold text-lg leading-none">P20</span><span class="text-[10px] text-gray-500 mt-1 font-medium">Tầng 2</span></div>
+                        <div class="room-item bg-green-50 text-green-700 py-2 px-1 rounded flex flex-col items-center justify-center border border-green-200 shadow-sm" data-floor="2"><span class="font-bold text-lg leading-none">P21</span><span class="text-[10px] text-gray-500 mt-1 font-medium">Tầng 2</span></div>
+                        <div class="room-item bg-green-50 text-green-700 py-2 px-1 rounded flex flex-col items-center justify-center border border-green-200 shadow-sm" data-floor="2"><span class="font-bold text-lg leading-none">P22</span><span class="text-[10px] text-gray-500 mt-1 font-medium">Tầng 2</span></div>
+                        <div class="room-item bg-green-50 text-green-700 py-2 px-1 rounded flex flex-col items-center justify-center border border-green-200 shadow-sm" data-floor="2"><span class="font-bold text-lg leading-none">P23</span><span class="text-[10px] text-gray-500 mt-1 font-medium">Tầng 2</span></div>
+                        <div class="room-item bg-green-50 text-green-700 py-2 px-1 rounded flex flex-col items-center justify-center border border-green-200 shadow-sm" data-floor="2"><span class="font-bold text-lg leading-none">P24</span><span class="text-[10px] text-gray-500 mt-1 font-medium">Tầng 2</span></div>
+
+                        <div class="room-item bg-orange-50 text-orange-700 py-2 px-1 rounded flex flex-col items-center justify-center border border-orange-200 shadow-sm" data-floor="1"><span class="font-bold text-lg leading-none">P25</span><span class="text-[10px] text-gray-500 mt-1 font-medium">Tầng 1</span></div>
+                        <div class="room-item bg-orange-50 text-orange-700 py-2 px-1 rounded flex flex-col items-center justify-center border border-orange-200 shadow-sm" data-floor="1"><span class="font-bold text-lg leading-none">P26</span><span class="text-[10px] text-gray-500 mt-1 font-medium">Tầng 1</span></div>
+                        <div class="room-item bg-orange-50 text-orange-700 py-2 px-1 rounded flex flex-col items-center justify-center border border-orange-200 shadow-sm" data-floor="1"><span class="font-bold text-lg leading-none">P27</span><span class="text-[10px] text-gray-500 mt-1 font-medium">Tầng 1</span></div>
+                        <div class="room-item bg-orange-50 text-orange-700 py-2 px-1 rounded flex flex-col items-center justify-center border border-orange-200 shadow-sm" data-floor="1"><span class="font-bold text-lg leading-none">P28</span><span class="text-[10px] text-gray-500 mt-1 font-medium">Tầng 1</span></div>
+                        <div class="room-item bg-orange-50 text-orange-700 py-2 px-1 rounded flex flex-col items-center justify-center border border-orange-200 shadow-sm" data-floor="1"><span class="font-bold text-lg leading-none">P29</span><span class="text-[10px] text-gray-500 mt-1 font-medium">Tầng 1</span></div>
+                        <div class="room-item bg-orange-50 text-orange-700 py-2 px-1 rounded flex flex-col items-center justify-center border border-orange-200 shadow-sm" data-floor="1"><span class="font-bold text-lg leading-none">P30</span><span class="text-[10px] text-gray-500 mt-1 font-medium">Tầng 1</span></div>
+                    </div>
+                </div>
+
+                <!-- Khu vực giữa (A2 - Sân - A4) -->
+                <div class="flex flex-col md:flex-row gap-6 w-full">
+                    <!-- DÃY A2 -->
+                    <div class="building-block w-full md:w-1/3 transition-all duration-300">
+                        <h3 class="text-center font-bold text-gray-700 bg-gray-200 py-1.5 rounded-t border border-gray-300 tracking-wide">DÃY A2</h3>
+                        <div class="grid grid-cols-2 lg:grid-cols-3 gap-2 p-3 border border-t-0 border-gray-300 rounded-b bg-gray-50">
+                            <!-- Tầng 3 -->
+                            <div class="room-item bg-blue-50 text-blue-700 py-2 px-1 rounded flex flex-col items-center justify-center border border-blue-200 shadow-sm" data-floor="3"><span class="font-bold text-base leading-none">P07</span><span class="text-[10px] text-gray-500 mt-1 font-medium">Tầng 3</span></div>
+                            <div class="room-item bg-blue-50 text-blue-700 py-2 px-1 rounded flex flex-col items-center justify-center border border-blue-200 shadow-sm" data-floor="3"><span class="font-bold text-base leading-none">P08</span><span class="text-[10px] text-gray-500 mt-1 font-medium">Tầng 3</span></div>
+                            <div class="room-item bg-blue-50 text-blue-700 py-2 px-1 rounded flex flex-col items-center justify-center border border-blue-200 shadow-sm" data-floor="3"><span class="font-bold text-base leading-none">P09</span><span class="text-[10px] text-gray-500 mt-1 font-medium">Tầng 3</span></div>
+                            <div class="room-item bg-blue-50 text-blue-700 py-2 px-1 rounded flex flex-col items-center justify-center border border-blue-200 shadow-sm" data-floor="3"><span class="font-bold text-base leading-none">P10</span><span class="text-[10px] text-gray-500 mt-1 font-medium">Tầng 3</span></div>
+                            <div class="room-item bg-blue-50 text-blue-700 py-2 px-1 rounded flex flex-col items-center justify-center border border-blue-200 shadow-sm" data-floor="3"><span class="font-bold text-base leading-none">P11</span><span class="text-[10px] text-gray-500 mt-1 font-medium">Tầng 3</span></div>
+                            <div class="room-item bg-blue-50 text-blue-700 py-2 px-1 rounded flex flex-col items-center justify-center border border-blue-200 shadow-sm" data-floor="3"><span class="font-bold text-base leading-none">P12</span><span class="text-[10px] text-gray-500 mt-1 font-medium">Tầng 3</span></div>
+                            <!-- Tầng 2 -->
+                            <div class="room-item bg-green-50 text-green-700 py-2 px-1 rounded flex flex-col items-center justify-center border border-green-200 shadow-sm" data-floor="2"><span class="font-bold text-base leading-none">P13</span><span class="text-[10px] text-gray-500 mt-1 font-medium">Tầng 2</span></div>
+                            <div class="room-item bg-green-50 text-green-700 py-2 px-1 rounded flex flex-col items-center justify-center border border-green-200 shadow-sm" data-floor="2"><span class="font-bold text-base leading-none">P14</span><span class="text-[10px] text-gray-500 mt-1 font-medium">Tầng 2</span></div>
+                            <div class="room-item bg-green-50 text-green-700 py-2 px-1 rounded flex flex-col items-center justify-center border border-green-200 shadow-sm" data-floor="2"><span class="font-bold text-base leading-none">P15</span><span class="text-[10px] text-gray-500 mt-1 font-medium">Tầng 2</span></div>
+                            <div class="room-item bg-green-50 text-green-700 py-2 px-1 rounded flex flex-col items-center justify-center border border-green-200 shadow-sm" data-floor="2"><span class="font-bold text-base leading-none">P16</span><span class="text-[10px] text-gray-500 mt-1 font-medium">Tầng 2</span></div>
+                            <div class="room-item bg-green-50 text-green-700 py-2 px-1 rounded flex flex-col items-center justify-center border border-green-200 shadow-sm" data-floor="2"><span class="font-bold text-base leading-none">P17</span><span class="text-[10px] text-gray-500 mt-1 font-medium">Tầng 2</span></div>
+                            <div class="room-item bg-green-50 text-green-700 py-2 px-1 rounded flex flex-col items-center justify-center border border-green-200 shadow-sm" data-floor="2"><span class="font-bold text-base leading-none">P18</span><span class="text-[10px] text-gray-500 mt-1 font-medium">Tầng 2</span></div>
+                            <!-- Tầng 1 -->
+                            <div class="room-item bg-orange-50 text-orange-700 py-2 px-1 rounded flex flex-col items-center justify-center border border-orange-200 shadow-sm" data-floor="1"><span class="font-bold text-base leading-none">P31</span><span class="text-[10px] text-gray-500 mt-1 font-medium">Tầng 1</span></div>
+                            <div class="room-item bg-orange-50 text-orange-700 py-2 px-1 rounded flex flex-col items-center justify-center border border-orange-200 shadow-sm" data-floor="1"><span class="font-bold text-base leading-none">P32</span><span class="text-[10px] text-gray-500 mt-1 font-medium">Tầng 1</span></div>
+                            <div class="room-item bg-orange-50 text-orange-700 py-2 px-1 rounded flex flex-col items-center justify-center border border-orange-200 shadow-sm" data-floor="1"><span class="font-bold text-base leading-none">P33</span><span class="text-[10px] text-gray-500 mt-1 font-medium">Tầng 1</span></div>
+                            <div class="room-item bg-orange-50 text-orange-700 py-2 px-1 rounded flex flex-col items-center justify-center border border-orange-200 shadow-sm" data-floor="1"><span class="font-bold text-base leading-none">P34</span><span class="text-[10px] text-gray-500 mt-1 font-medium">Tầng 1</span></div>
+                            <div class="room-item bg-orange-50 text-orange-700 py-2 px-1 rounded flex flex-col items-center justify-center border border-orange-200 shadow-sm" data-floor="1"><span class="font-bold text-base leading-none">P35</span><span class="text-[10px] text-gray-500 mt-1 font-medium">Tầng 1</span></div>
+                            <div class="room-item bg-orange-50 text-orange-700 py-2 px-1 rounded flex flex-col items-center justify-center border border-orange-200 shadow-sm" data-floor="1"><span class="font-bold text-base leading-none">P36</span><span class="text-[10px] text-gray-500 mt-1 font-medium">Tầng 1</span></div>
+                            <div class="room-item bg-orange-50 text-orange-700 py-2 px-1 rounded flex flex-col items-center justify-center border border-orange-200 shadow-sm" data-floor="1"><span class="font-bold text-base leading-none">P37</span><span class="text-[10px] text-gray-500 mt-1 font-medium">Tầng 1</span></div>
+                        </div>
+                    </div>
+
+                    <!-- KHOẢNG SÂN -->
+                    <div class="hidden md:flex flex-1 items-center justify-center border-2 border-dashed border-gray-300 rounded-xl bg-gray-50/50">
+                        <span class="text-gray-400 font-bold tracking-widest uppercase">Sân Trường</span>
+                    </div>
+
+                    <!-- DÃY A4 -->
+                    <div class="building-block w-full md:w-1/4 transition-all duration-300">
+                        <h3 class="text-center font-bold text-gray-700 bg-gray-200 py-1.5 rounded-t border border-gray-300 tracking-wide">DÃY A4</h3>
+                        <div class="flex flex-col gap-3 p-3 border border-t-0 border-gray-300 rounded-b bg-gray-50 h-[calc(100%-36px)]">
+                            <div class="room-item bg-blue-50 text-blue-700 py-3 px-2 rounded flex flex-col items-center justify-center border border-blue-200 shadow-sm" data-floor="3">
+                                <span class="font-bold text-sm text-center leading-none">Dự phòng 1</span>
+                                <span class="text-[10px] text-gray-500 mt-1 font-medium">Tầng 3</span>
+                            </div>
+                            <div class="room-item bg-green-50 text-green-700 py-3 px-2 rounded flex flex-col items-center justify-center border border-green-200 shadow-sm" data-floor="2">
+                                <span class="font-bold text-sm text-center leading-none">Dự phòng 2</span>
+                                <span class="text-[10px] text-gray-500 mt-1 font-medium">Tầng 2</span>
+                            </div>
+                            <div class="room-item bg-orange-50 text-orange-700 py-4 px-2 rounded flex flex-col items-center justify-center border border-orange-200 shadow-sm h-full" data-floor="1">
+                                <span class="font-bold text-sm text-center leading-tight">PHÒNG<br>HỘI ĐỒNG</span>
+                                <span class="text-[10px] text-gray-500 mt-1 font-medium">Tầng 1</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Khu vực dưới cùng (A1 & Cổng) -->
+                <div class="flex flex-col md:flex-row gap-6 w-full">
+                    <!-- DÃY A1 -->
+                    <div class="building-block w-full md:flex-1 transition-all duration-300">
+                        <h3 class="text-center font-bold text-gray-700 bg-gray-200 py-1.5 rounded-t border border-gray-300 tracking-wide">KHU HÀNH CHÍNH (A1)</h3>
+                        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2 p-3 border border-t-0 border-gray-300 rounded-b bg-gray-50">
+                            <div class="room-item bg-orange-50 text-orange-700 py-2 px-1 rounded flex flex-col items-center justify-center border border-orange-200 shadow-sm text-center" data-floor="1"><span class="font-bold text-xs leading-tight">P. Thư ký</span><span class="text-[10px] text-gray-500 mt-1">Tầng 1</span></div>
+                            <div class="room-item bg-orange-50 text-orange-700 py-2 px-1 rounded flex flex-col items-center justify-center border border-orange-200 shadow-sm text-center" data-floor="1"><span class="font-bold text-xs leading-tight">P. Chủ tịch</span><span class="text-[10px] text-gray-500 mt-1">Tầng 1</span></div>
+                            <div class="room-item bg-orange-50 text-orange-700 py-2 px-1 rounded flex flex-col items-center justify-center border border-orange-200 shadow-sm text-center" data-floor="1"><span class="font-bold text-xs leading-tight">P. họp CA</span><span class="text-[10px] text-gray-500 mt-1">Tầng 1</span></div>
+                            <div class="room-item bg-orange-50 text-orange-700 py-2 px-1 rounded flex flex-col items-center justify-center border border-orange-200 shadow-sm text-center" data-floor="1"><span class="font-bold text-xs leading-tight">P. Phó CT</span><span class="text-[10px] text-gray-500 mt-1">Tầng 1</span></div>
+                            <div class="room-item bg-orange-50 text-orange-700 py-2 px-1 rounded flex flex-col items-center justify-center border border-orange-200 shadow-sm text-center" data-floor="1"><span class="font-bold text-xs leading-tight">P. Y tế</span><span class="text-[10px] text-gray-500 mt-1">Tầng 1</span></div>
+                            <div class="room-item bg-orange-50 text-orange-700 py-2 px-1 rounded flex flex-col items-center justify-center border border-orange-200 shadow-sm text-center" data-floor="1"><span class="font-bold text-xs leading-tight">P. Phục vụ</span><span class="text-[10px] text-gray-500 mt-1">Tầng 1</span></div>
+                        </div>
+                    </div>
+
+                    <!-- CỔNG VÀO -->
+                    <div class="building-block w-full md:w-1/4 flex flex-row md:flex-col gap-3 justify-end transition-all duration-300">
+                        <div class="flex-1 room-item bg-yellow-50 text-yellow-700 font-bold py-2 px-2 rounded flex flex-col items-center justify-center border border-yellow-300 shadow-sm text-sm" data-floor="1">
+                            Phòng Bảo vệ
+                        </div>
+                        <div class="flex-1 room-item bg-yellow-50 text-yellow-700 font-bold py-2 px-2 rounded flex flex-col items-center justify-center border border-yellow-300 shadow-sm text-sm" data-floor="1">
+                            Phòng Chờ
+                        </div>
+                        <div class="w-full bg-gray-800 text-white font-black py-3 px-3 rounded shadow-md text-center tracking-wider text-sm mt-auto">
+                            <span class="hidden md:inline">⬅</span> CỔNG VÀO <span class="inline md:hidden">⬆</span>
+                        </div>
+                    </div>
+                </div>
+                
+            </div>
+            <p class="text-xs text-gray-400 mt-6 text-center max-w-lg">Sơ đồ này được mô phỏng trực quan dựa trên sự sắp xếp thực tế các dãy nhà và khu vực hành chính trong cụm thi.</p>
         </div>
     </main>
 
     <script>
-        // --- BIẾN TOÀN CỤC ---
+        // --- CHUYỂN ĐỔI CHẾ ĐỘ XEM (TABS) ---
+        window.switchTab = function(tab) {
+            const btnMap = document.getElementById('tab-btn-map');
+            const btnSchema = document.getElementById('tab-btn-schema');
+            const mapContainer = document.getElementById('map');
+            const schemaView = document.getElementById('schema-view');
+            const mapControls = document.getElementById('map-controls');
+            const schemaControls = document.getElementById('schema-controls');
+
+            if (tab === 'map') {
+                btnMap.className = "flex-1 py-3.5 text-sm font-semibold text-blue-600 border-b-2 border-blue-600 bg-blue-50/30 transition-all";
+                btnSchema.className = "flex-1 py-3.5 text-sm font-semibold text-gray-500 border-b-2 border-transparent hover:text-blue-600 hover:bg-gray-50 transition-all";
+                
+                mapContainer.classList.remove('hidden');
+                schemaView.classList.add('hidden');
+                mapControls.classList.remove('hidden');
+                schemaControls.classList.add('hidden');
+                
+                // Khắc phục lỗi hiển thị bản đồ của Leaflet khi div bị ẩn trước đó
+                setTimeout(() => { if(map) map.invalidateSize(); }, 100);
+            } else {
+                btnSchema.className = "flex-1 py-3.5 text-sm font-semibold text-blue-600 border-b-2 border-blue-600 bg-blue-50/30 transition-all";
+                btnMap.className = "flex-1 py-3.5 text-sm font-semibold text-gray-500 border-b-2 border-transparent hover:text-blue-600 hover:bg-gray-50 transition-all";
+                
+                mapContainer.classList.add('hidden');
+                schemaView.classList.remove('hidden');
+                mapControls.classList.add('hidden');
+                schemaControls.classList.remove('hidden');
+            }
+        };
+
+        // --- BỘ LỌC TẦNG CHO SƠ ĐỒ PHÒNG THI ---
+        window.filterFloor = function(floorId) {
+            // Cập nhật trạng thái nút bấm
+            const btns = document.querySelectorAll('.floor-btn');
+            btns.forEach(btn => {
+                if (btn.id === `btn-floor-${floorId}`) {
+                    btn.className = `floor-btn w-full bg-indigo-600 text-white font-medium py-2 rounded-lg shadow-sm transition-colors border border-indigo-600`;
+                } else {
+                    btn.className = `floor-btn w-full bg-white text-gray-700 hover:bg-indigo-50 font-medium py-2 rounded-lg border border-gray-200 transition-colors`;
+                }
+            });
+
+            // Ẩn/Hiện các phòng thi dựa theo thuộc tính data-floor
+            const rooms = document.querySelectorAll('.room-item');
+            rooms.forEach(room => {
+                if (floorId === 'all' || room.getAttribute('data-floor') === floorId) {
+                    room.classList.remove('hidden');
+                } else {
+                    room.classList.add('hidden');
+                }
+            });
+
+            // Tự động thu gọn các dãy nhà (building block) nếu không có phòng nào ở tầng đang chọn
+            const buildings = document.querySelectorAll('.building-block');
+            buildings.forEach(b => {
+                // Kiểm tra xem trong block này còn phòng nào đang hiển thị (không có class hidden) không
+                const visibleRooms = b.querySelectorAll('.room-item:not(.hidden)');
+                if (visibleRooms.length === 0) {
+                    b.classList.add('hidden');
+                } else {
+                    b.classList.remove('hidden');
+                }
+            });
+        };
+
+        // --- BIẾN TOÀN CỤC BẢN ĐỒ ---
         let map;
         let userMarker = null;
         let userLocation = null;
@@ -213,7 +431,7 @@
                     statusEl.innerHTML = `<i class="ph-fill ph-x-circle"></i> Lỗi dữ liệu`;
                     statusEl.className = "mt-2 text-xs bg-red-600 text-white py-1 px-2.5 rounded-md flex items-center gap-1.5 w-fit font-medium";
                     
-                    alert("Không thể tải sơ đồ thi tự động. Vui lòng đảm bảo bạn đã đặt file 'map.kmz' cùng cấp thư mục với file index.html trên Github!");
+                    // console.error("Không thể tải sơ đồ thi tự động. Vui lòng đảm bảo bạn đã đặt file 'map.kmz' cùng cấp thư mục với file index.html trên Github!");
                 });
         }
 
@@ -284,13 +502,10 @@
                     // Mở khóa các bộ lọc lọc địa điểm
                     const filterSec = document.getElementById('filterSection');
                     filterSec.classList.remove('opacity-50', 'pointer-events-none');
-                } else {
-                    alert("Tệp tin KMZ của bạn không chứa các tọa độ điểm mốc hợp lệ.");
                 }
 
             } catch (err) {
-                alert("Lỗi khi phân tích dữ liệu KML: " + err.message);
-                console.error(err);
+                console.error("Lỗi khi phân tích dữ liệu KML: " + err.message);
             }
         }
 
@@ -400,7 +615,6 @@
                     let fallbackLat = 18.684110;
                     let fallbackLng = 105.665545;
 
-                    // Nếu người dùng đã tải KMZ, ta lấy đại một điểm trong đó làm gốc giả định để thử nghiệm
                     let foundPoints = false;
                     Object.keys(layerGroups).forEach(key => {
                         const layers = layerGroups[key].getLayers();
@@ -447,19 +661,14 @@
 
         // Khởi chạy Google Maps để dẫn đường
         window.calculateRoute = function(destLat, destLng) {
-            // Đóng popup đang mở trên Leaflet
             map.closePopup();
 
-            // Lấy tọa độ xuất phát nếu có
             let originStr = "";
             if (userLocation) {
                 originStr = `${userLocation.lat},${userLocation.lng}`;
             }
 
-            // Tạo URL chỉ đường của Google Maps API (Nếu origin rỗng, Google Maps sẽ tự lấy "Vị trí của tôi")
             const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${originStr}&destination=${destLat},${destLng}&travelmode=driving`;
-
-            // Mở liên kết trong tab mới hoặc khởi chạy App Google Maps trên điện thoại
             window.open(googleMapsUrl, '_blank');
         }
     </script>

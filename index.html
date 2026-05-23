@@ -365,6 +365,7 @@
             // Ẩn/Hiện các phòng thi dựa theo thuộc tính data-floor
             const rooms = document.querySelectorAll('.room-item');
             rooms.forEach(room => {
+                // Đã loại bỏ điều kiện: floorId === 'all' ||
                 if (room.getAttribute('data-floor') === floorId) {
                     room.classList.remove('hidden');
                 } else {

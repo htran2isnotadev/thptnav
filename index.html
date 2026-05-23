@@ -59,26 +59,15 @@
                 <i class="ph-fill ph-graduation-cap text-2xl"></i>
                 Hỗ Trợ Thi THPT
             </h1>
-            <p class="text-sm text-blue-100 mt-1">Định vị trực tiếp từ file KMZ</p>
+            <p class="text-sm text-blue-100 mt-1">Hệ thống định vị & hỗ trợ thí sinh</p>
+            <!-- Trạng thái tải dữ liệu -->
+            <div id="dataStatus" class="mt-2 text-xs bg-blue-700 text-blue-100 py-1 px-2.5 rounded-md flex items-center gap-1.5 w-fit">
+                <i class="ph ph-spinner animate-spin"></i> Đang tải sơ đồ...
+            </div>
         </div>
 
         <!-- Controls -->
         <div class="p-5 flex-1 overflow-y-auto no-scrollbar flex flex-col gap-5">
-            
-            <!-- Bộ nạp file KMZ trực tiếp -->
-            <div class="bg-amber-50 p-4 rounded-xl border border-amber-200">
-                <h3 class="font-semibold text-amber-900 mb-2 flex items-center gap-2">
-                    <i class="ph-fill ph-folder-open text-amber-600"></i> Sơ đồ thi của bạn
-                </h3>
-                <p id="kmzIntroText" class="text-xs text-amber-800 mb-3">Hệ thống đang tự động tải tệp tin <code class="font-bold">Sơ đồ điểm thi.kmz</code> từ máy chủ.</p>
-                <label class="w-full flex flex-col items-center justify-center px-4 py-3 bg-white text-blue-600 rounded-lg shadow-sm tracking-wide uppercase border border-blue-200 cursor-pointer hover:bg-blue-50 transition-colors text-sm font-semibold">
-                    <span id="fileNameLabel" class="normal-case truncate max-w-[200px]">Chọn file .KMZ khác</span>
-                    <input type='file' id="kmzFileInput" accept=".kmz" class="hidden" onchange="handleFileSelect(event)" />
-                </label>
-                <div id="loadingStatus" class="hidden text-xs text-blue-600 mt-2 font-medium flex items-center gap-1">
-                    <i class="ph ph-spinner animate-spin"></i> Đang đọc và dựng sơ đồ...
-                </div>
-            </div>
 
             <!-- Vị trí của tôi -->
             <div class="bg-blue-50 p-4 rounded-xl border border-blue-100">
@@ -208,25 +197,21 @@
 
         // --- TỰ ĐỘNG TẢI FILE KMZ TỪ REPO ---
         function autoLoadDefaultKMZ() {
-            const defaultKmzPath = 'Sơ đồ điểm thi.kmz'; // Tên file nằm cùng thư mục với file index.html trên GitHub
-            const loadingStatus = document.getElementById('loadingStatus');
-            const kmzIntroText = document.getElementById('kmzIntroText');
+            const defaultKmzPath = 'map.kmz'; // Tên file nằm cùng thư mục với file index.html trên GitHub
+            const statusEl = document.getElementById('dataStatus');
             
-            loadingStatus.classList.remove('hidden');
-            loadingStatus.innerHTML = `<i class="ph ph-spinner animate-spin"></i> Đang tự động tải sơ đồ thi...`;
+            statusEl.innerHTML = `<i class="ph ph-spinner animate-spin"></i> Đang tải sơ đồ thi...`;
+            statusEl.className = "mt-2 text-xs bg-blue-700 text-blue-100 py-1 px-2.5 rounded-md flex items-center gap-1.5 w-fit";
 
             // Gọi API lấy file dưới dạng ArrayBuffer trực tiếp từ server tĩnh (GitHub Pages)
             fetch(defaultKmzPath)
                 .then(response => {
                     if (!response.ok) {
-                        throw new Error('Chưa tìm thấy file KMZ mặc định trên máy chủ. Hãy tải file lên thủ công hoặc kiểm tra lại repo của bạn.');
+                        throw new Error('Chưa tìm thấy file KMZ trên máy chủ. Hãy kiểm tra xem file "map.kmz" đã được upload lên repo chưa.');
                     }
                     return response.arrayBuffer();
                 })
                 .then(arrayBuffer => {
-                    document.getElementById('fileNameLabel').textContent = defaultKmzPath;
-                    kmzIntroText.innerHTML = `Sơ đồ <code class="font-bold">Sơ đồ điểm thi.kmz</code> đã được tải thành công từ máy chủ hệ thống.`;
-                    
                     // Giải nén file bằng thư viện JSZip đã cài đặt ở header
                     return JSZip.loadAsync(arrayBuffer);
                 })
@@ -239,53 +224,22 @@
                 })
                 .then(kmlText => {
                     parseAndDisplayKml(kmlText);
+                    
+                    // Cập nhật trạng thái tải thành công lên header
+                    statusEl.innerHTML = `<i class="ph-fill ph-check-circle"></i> Đã tải sơ đồ`;
+                    statusEl.className = "mt-2 text-xs bg-green-600 text-white py-1 px-2.5 rounded-md flex items-center gap-1.5 w-fit font-medium";
                 })
                 .catch(err => {
                     console.warn("Tải KMZ tự động không thành công: " + err.message);
-                    // Hiển thị trạng thái chờ người dùng tải file lên thủ công
-                    loadingStatus.innerHTML = `<span class="text-amber-700 font-normal flex items-center gap-1"><i class="ph ph-info"></i> Hãy chọn file .KMZ của bạn bên dưới để bắt đầu hiển thị bản đồ.</span>`;
-                    kmzIntroText.innerHTML = `Vui lòng tải lên file <code class="font-bold">Sơ đồ điểm thi.kmz</code> đã xuất từ Google My Maps.`;
+                    statusEl.innerHTML = `<i class="ph-fill ph-x-circle"></i> Lỗi dữ liệu`;
+                    statusEl.className = "mt-2 text-xs bg-red-600 text-white py-1 px-2.5 rounded-md flex items-center gap-1.5 w-fit font-medium";
+                    
+                    alert("Không thể tải sơ đồ thi tự động. Vui lòng đảm bảo bạn đã đặt file 'map.kmz' cùng cấp thư mục với file index.html trên Github!");
                 });
         }
 
-        // --- XỬ LÝ ĐỌC FILE KMZ THỦ CÔNG ---
-        window.handleFileSelect = function(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            document.getElementById('fileNameLabel').textContent = file.name;
-            const loadingStatus = document.getElementById('loadingStatus');
-            loadingStatus.classList.remove('hidden');
-            loadingStatus.innerHTML = `<i class="ph ph-spinner animate-spin"></i> Đang đọc và dựng sơ đồ...`;
-
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const arrayBuffer = e.target.result;
-                
-                // Giải nén file .kmz thủ công
-                JSZip.loadAsync(arrayBuffer).then(function(zip) {
-                    const kmlFile = Object.keys(zip.files).find(name => name.endsWith('.kml'));
-                    if (!kmlFile) {
-                        alert("Không tìm thấy tệp tin dữ liệu .kml hợp lệ bên trong file KMZ.");
-                        loadingStatus.classList.add('hidden');
-                        return;
-                    }
-
-                    zip.files[kmlFile].async("string").then(function(kmlText) {
-                        parseAndDisplayKml(kmlText);
-                        document.getElementById('kmzIntroText').innerHTML = `Đang hiển thị dữ liệu từ file vừa tải lên: <code class="font-bold">${file.name}</code>`;
-                    });
-                }).catch(function(err) {
-                    alert("Lỗi khi giải nén tệp KMZ: " + err.message);
-                    loadingStatus.classList.add('hidden');
-                });
-            };
-            reader.readAsArrayBuffer(file);
-        };
-
         // Hàm phân tích XML KML sang GeoJSON và phân loại thông minh
         function parseAndDisplayKml(kmlString) {
-            const loadingStatus = document.getElementById('loadingStatus');
             try {
                 // Phân tích cú pháp chuỗi XML của KML
                 const parser = new DOMParser();
@@ -358,8 +312,6 @@
             } catch (err) {
                 alert("Lỗi khi phân tích dữ liệu KML: " + err.message);
                 console.error(err);
-            } finally {
-                loadingStatus.classList.add('hidden');
             }
         }
 

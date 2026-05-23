@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bản Đồ Hỗ Trợ Thi THPT - OpenStreetMap</title>
+    
+    <!-- Sử dụng Tailwind CSS cho giao diện -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Phosphor Icons cho biểu tượng -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
+    <!-- Leaflet CSS & JS (Mã nguồn mở thay thế Google Maps) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- Leaflet Routing Machine (Để chỉ đường) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+
+    <!-- Thư viện hỗ trợ đọc file KMZ -->
+    <script src="https://unpkg.com/leaflet-kmz@latest/dist/leaflet-kmz.js"></script>
+
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        #map { height: 100%; width: 100%; border-radius: 0.5rem; z-index: 1; }
+        .custom-info-window { max-width: 250px; }
+        
+        /* Ẩn thanh scrollbar cho sidebar */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* Ẩn bảng hướng dẫn chỉ đường mặc định của Leaflet để giao diện gọn hơn */
+        .leaflet-routing-container { display: none !important; }
+
+        /* Tạo điểm nháy cho vị trí người dùng */
+        .user-marker {
+            width: 16px;
+            height: 16px;
+            background-color: #2563EB;
+            border: 2px solid white;
+            border-radius: 50%;
+            box-shadow: 0 0 4px rgba(0,0,0,0.5);
+        }
+        .user-marker-fallback {
+            background-color: #F97316; /* Màu cam nếu dùng vị trí mô phỏng */
+        }
+    </style>
+</head>
+<body class="bg-gray-50 h-screen overflow-hidden flex flex-col md:flex-row">
+
+    <!-- Sidebar / Bảng điều khiển -->
+    <aside class="w-full md:w-80 lg:w-96 bg-white shadow-lg z-10 flex flex-col h-auto md:h-full shrink-0">
+        <!-- Header -->
+        <div class="p-5 border-b border-gray-100 bg-blue-600 text-white rounded-b-xl md:rounded-none">
+            <h1 class="text-xl font-bold flex items-center gap-2">
+                <i class="ph-fill ph-graduation-cap text-2xl"></i>
+                Hỗ Trợ Thi THPT
+            </h1>
+            <p class="text-sm text-blue-100 mt-1">Định vị bằng OpenStreetMap</p>
+        </div>
+
+        <!-- Controls -->
+        <div class="p-5 flex-1 overflow-y-auto no-scrollbar flex flex-col gap-6">
+            
+            <!-- Vị trí của tôi -->
+            <div class="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                <h3 class="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                    <i class="ph-fill ph-navigation-arrow text-blue-600"></i> Vị trí của bạn
+                </h3>
+                <button onclick="findMyLocation()" id="btnLocation" class="w-full bg-white border border-blue-200 hover:bg-blue-100 text-blue-700 py-2.5 rounded-lg flex items-center justify-center gap-2 font-medium transition-colors shadow-sm">
+                    <i class="ph ph-crosshair"></i> Tìm vị trí hiện tại
+                </button>
+                <p id="locationStatus" class="text-xs font-medium mt-2 hidden"></p>
+            </div>
+
+            <!-- Bộ lọc -->
+            <div>
+                <h3 class="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                    <i class="ph-fill ph-funnel text-orange-500"></i> Hiển thị trên bản đồ
+                </h3>
+                <div class="flex flex-col gap-3">
+                    <label class="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200 cursor-pointer hover:bg-gray-100 transition-colors">
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center text-red-600">
+                                <i class="ph-fill ph-school"></i>
+                            </div>
+                            <span class="font-medium text-gray-700">Điểm thi</span>
+                        </div>
+                        <input type="checkbox" checked class="w-5 h-5 text-blue-600 rounded focus:ring-blue-500" onchange="toggleCategory('exam', this.checked)">
+                    </label>
+
+                    <label class="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200 cursor-pointer hover:bg-gray-100 transition-colors">
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+                                <i class="ph-fill ph-bed"></i>
+                            </div>
+                            <span class="font-medium text-gray-700">Nhà nghỉ / Khách sạn</span>
+                        </div>
+                        <input type="checkbox" checked class="w-5 h-5 text-blue-600 rounded focus:ring-blue-500" onchange="toggleCategory('hotel', this.checked)">
+                    </label>
+
+                    <label class="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200 cursor-pointer hover:bg-gray-100 transition-colors">
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-600">
+                                <i class="ph-fill ph-fork-knife"></i>
+                            </div>
+                            <span class="font-medium text-gray-700">Nhà hàng / Quán ăn</span>
+                        </div>
+                        <input type="checkbox" checked class="w-5 h-5 text-blue-600 rounded focus:ring-blue-500" onchange="toggleCategory('food', this.checked)">
+                    </label>
+                </div>
+            </div>
+
+            <!-- Panel Chỉ đường -->
+            <div id="directionsPanelContainer" class="hidden">
+                <h3 class="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                    <i class="ph-fill ph-map-trifold text-purple-500"></i> Thông tin lộ trình
+                </h3>
+                <div class="bg-purple-50 p-4 rounded-lg border border-purple-100 text-sm" id="directionsDetails">
+                    Đang tính toán đường đi...
+                </div>
+                <button onclick="clearRoute()" class="mt-3 w-full text-red-600 bg-red-50 hover:bg-red-100 py-2.5 rounded-lg text-sm font-medium transition-colors shadow-sm">
+                    Xóa lộ trình & Trở về
+                </button>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Khu vực Bản đồ -->
+    <main class="flex-1 p-2 md:p-4 bg-gray-200 relative">
+        <div id="map" class="bg-white shadow-inner">
+            <!-- Bản đồ Leaflet sẽ được vẽ vào đây -->
+        </div>
+    </main>
+
+    <script>
+        // --- BIẾN TOÀN CỤC ---
+        let map;
+        let routingControl = null;
+        let userMarker = null;
+        let userLocation = null;
+        
+        // Quản lý các layer (tương ứng với Checkbox bộ lọc)
+        const layerGroups = {
+            exam: L.layerGroup(),
+            hotel: L.layerGroup(),
+            food: L.layerGroup()
+        };
+
+        // Dữ liệu mẫu (Vinh, Nghệ An)
+        const mockData = [
+            { id: 1, type: 'exam', name: 'THPT chuyên Phan Bội Châu', address: '48 Lê Hồng Phong, Hưng Phúc, TP Vinh', lat: 18.677532, lng: 105.676648 },
+            { id: 2, type: 'exam', name: 'THPT Huỳnh Thúc Kháng', address: '62 Lê Hồng Phong, Hưng Phúc, TP Vinh', lat: 18.676500, lng: 105.678000 },
+            { id: 3, type: 'exam', name: 'THPT Hà Huy Tập', address: '08 Phan Bội Châu, Lê Lợi, TP Vinh', lat: 18.687200, lng: 105.670500 },
+            { id: 4, type: 'hotel', name: 'Khách sạn Mường Thanh', address: '1 Phan Bội Châu, Quán Bàu, TP Vinh', lat: 18.689000, lng: 105.671000 },
+            { id: 5, type: 'hotel', name: 'Nhà nghỉ Bình Minh', address: 'Ngõ 2 Lê Hồng Phong, TP Vinh', lat: 18.678000, lng: 105.675000 },
+            { id: 6, type: 'food', name: 'Phở Bát Đàn', address: 'Đường Nguyễn Văn Cừ, TP Vinh', lat: 18.680000, lng: 105.682000 },
+            { id: 7, type: 'food', name: 'Cơm bình dân sinh viên', address: 'Gần cổng trường Phan Bội Châu', lat: 18.677000, lng: 105.677000 }
+        ];
+
+        // Hàm tạo Icon theo màu sắc cho Leaflet
+        function getCustomIcon(color) {
+            return new L.Icon({
+                iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-${color}.png`,
+                shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+                iconSize: [25, 41],
+                iconAnchor: [12, 41],
+                popupAnchor: [1, -34],
+                shadowSize: [41, 41]
+            });
+        }
+
+        const icons = {
+            exam: { icon: getCustomIcon('red'), name: 'Điểm thi', colorClass: 'bg-red-100 text-red-700' },
+            hotel: { icon: getCustomIcon('blue'), name: 'Nhà nghỉ', colorClass: 'bg-blue-100 text-blue-700' },
+            food: { icon: getCustomIcon('green'), name: 'Nhà hàng', colorClass: 'bg-green-100 text-green-700' }
+        };
+
+        // --- KHỞI TẠO BẢN ĐỒ ---
+        window.onload = function() {
+            // Tọa độ trung tâm (TP Vinh)
+            map = L.map('map').setView([18.6775, 105.6766], 14);
+
+            // Thêm lớp bản đồ từ OpenStreetMap
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                maxZoom: 19,
+            }).addTo(map);
+
+            // Thêm các Layer Group vào bản đồ
+            layerGroups.exam.addTo(map);
+            layerGroups.hotel.addTo(map);
+            layerGroups.food.addTo(map);
+
+            // Vẽ dữ liệu mẫu
+            loadMockData();
+
+            // --- ĐỂ HIỂN THỊ FILE KMZ ---
+            // Bạn hãy tải file "Sơ đồ điểm thi.kmz" lên một host công khai.
+            // Sau đó bỏ comment dòng dưới đây và truyền đường link vào:
+            // loadKMZLayer('https://domain-cua-ban.com/So_do_diem_thi.kmz');
+        };
+
+        // Hàm đọc và vẽ file KMZ
+        function loadKMZLayer(url) {
+            const kmzParser = L.kmzLayer().addTo(map);
+
+            kmzParser.on('load', function(e) {
+                // Tự động zoom bản đồ đến khu vực của file KMZ
+                map.fitBounds(e.layer.getBounds());
+            });
+
+            kmzParser.load(url);
+        }
+
+        // Tải dữ liệu các địa điểm
+        function loadMockData() {
+            mockData.forEach(place => {
+                const config = icons[place.type];
+                
+                const marker = L.marker([place.lat, place.lng], { icon: config.icon });
+                
+                const popupContent = `
+                    <div class="custom-info-window p-1">
+                        <span class="inline-block px-2 py-1 rounded text-xs font-semibold mb-2 ${config.colorClass}">${config.name}</span>
+                        <h3 class="text-base font-bold text-gray-800 mb-1">${place.name}</h3>
+                        <p class="text-sm text-gray-600 mb-3"><i class="ph ph-map-pin"></i> ${place.address}</p>
+                        <button onclick="calculateRoute(${place.lat}, ${place.lng})" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-1.5 rounded text-sm transition-colors shadow-sm cursor-pointer">
+                            <i class="ph ph-arrow-u-down-right"></i> Chỉ đường đến đây
+                        </button>
+                    </div>
+                `;
+
+                marker.bindPopup(popupContent);
+                layerGroups[place.type].addLayer(marker);
+            });
+        }
+
+        // Ẩn/Hiện địa điểm trên bản đồ
+        window.toggleCategory = function(category, isVisible) {
+            if (isVisible) {
+                map.addLayer(layerGroups[category]);
+            } else {
+                map.removeLayer(layerGroups[category]);
+            }
+        }
+
+        // --- ĐỊNH VỊ VÀ TÌM ĐƯỜNG ---
+
+        // Lấy vị trí người dùng
+        window.findMyLocation = function() {
+            const statusEl = document.getElementById('locationStatus');
+            const btn = document.getElementById('btnLocation');
+            
+            if (!navigator.geolocation) {
+                alert("Trình duyệt của bạn không hỗ trợ định vị.");
+                return;
+            }
+
+            statusEl.classList.remove('hidden');
+            statusEl.textContent = "Đang lấy tọa độ...";
+            btn.classList.add('opacity-50');
+
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    handleLocationSuccess(position.coords.latitude, position.coords.longitude);
+                    statusEl.textContent = "Đã tìm thấy vị trí!";
+                    statusEl.className = "text-xs font-medium mt-2 text-green-600";
+                    btn.classList.remove('opacity-50');
+                },
+                (error) => {
+                    console.warn("Bị chặn GPS. Dùng vị trí giả định (Ga Vinh).");
+                    // Fallback: Ga Vinh, Nghệ An
+                    handleLocationSuccess(18.684110, 105.665545, true);
+                    
+                    statusEl.textContent = "Đã dùng vị trí mô phỏng do không có quyền GPS.";
+                    statusEl.className = "text-xs font-medium mt-2 text-orange-600";
+                    btn.classList.remove('opacity-50');
+                },
+                { enableHighAccuracy: true, timeout: 5000 }
+            );
+        }
+
+        function handleLocationSuccess(lat, lng, isFallback = false) {
+            userLocation = { lat, lng };
+
+            // Tạo icon custom cho người dùng
+            const iconHtml = `<div class="user-marker ${isFallback ? 'user-marker-fallback' : ''}"></div>`;
+            const icon = L.divIcon({
+                className: 'custom-user-icon',
+                html: iconHtml,
+                iconSize: [16, 16],
+                iconAnchor: [8, 8]
+            });
+
+            if (userMarker) {
+                userMarker.setLatLng([lat, lng]);
+                userMarker.setIcon(icon);
+            } else {
+                userMarker = L.marker([lat, lng], { icon: icon }).addTo(map);
+                userMarker.bindPopup(isFallback ? "<b>Vị trí mô phỏng</b>" : "<b>Vị trí của bạn</b>");
+            }
+
+            map.setView([lat, lng], 15);
+        }
+
+        // Chỉ đường
+        window.calculateRoute = function(destLat, destLng) {
+            if (!userLocation) {
+                alert("Vui lòng ấn 'Tìm vị trí hiện tại' ở bảng điều khiển trước khi tìm đường!");
+                findMyLocation();
+                return;
+            }
+
+            // Đóng popup đang mở
+            map.closePopup();
+
+            // Xóa lộ trình cũ nếu có
+            if (routingControl) {
+                map.removeControl(routingControl);
+            }
+
+            document.getElementById('directionsPanelContainer').classList.remove('hidden');
+            document.getElementById('directionsDetails').innerHTML = `<i class="ph ph-spinner animate-spin text-purple-600"></i> Đang tìm đường...`;
+
+            // Gọi Leaflet Routing Machine (Sử dụng OSRM backend miễn phí)
+            routingControl = L.Routing.control({
+                waypoints: [
+                    L.latLng(userLocation.lat, userLocation.lng),
+                    L.latLng(destLat, destLng)
+                ],
+                routeWhileDragging: false,
+                addWaypoints: false,
+                fitSelectedRoutes: true,
+                showAlternatives: false,
+                lineOptions: {
+                    styles: [{ color: '#8b5cf6', opacity: 0.8, weight: 5 }] // Màu tím
+                },
+                createMarker: function() { return null; } // Không tạo thêm marker A B để tránh rối mắt
+            }).addTo(map);
+
+            // Bắt sự kiện khi tìm được đường để hiển thị thông tin
+            routingControl.on('routesfound', function(e) {
+                const routes = e.routes;
+                const summary = routes[0].summary;
+                
+                // Chuyển đổi mét sang km, giây sang phút
+                const distance = (summary.totalDistance / 1000).toFixed(1);
+                const time = Math.round(summary.totalTime / 60);
+
+                document.getElementById('directionsDetails').innerHTML = `
+                    <div class="flex flex-col gap-2">
+                        <div class="flex items-center gap-2 text-gray-800">
+                            <i class="ph-fill ph-ruler text-purple-600"></i>
+                            <span>Khoảng cách: <b>${distance} km</b></span>
+                        </div>
+                        <div class="flex items-center gap-2 text-gray-800">
+                            <i class="ph-fill ph-clock text-purple-600"></i>
+                            <span>Thời gian lái xe: <b>${time} phút</b></span>
+                        </div>
+                    </div>
+                `;
+
+                // Tự động cuộn xuống dưới ở Mobile
+                if(window.innerWidth < 768) {
+                    document.querySelector('aside').scrollTop = document.querySelector('aside').scrollHeight;
+                }
+            });
+            
+            // Xử lý lỗi nếu không tìm được đường
+            routingControl.on('routingerror', function() {
+                document.getElementById('directionsDetails').innerHTML = `<span class="text-red-600">Không thể tìm được đường đi.</span>`;
+            });
+        }
+
+        // Xóa lộ trình
+        window.clearRoute = function() {
+            if (routingControl) {
+                map.removeControl(routingControl);
+                routingControl = null;
+            }
+            document.getElementById('directionsPanelContainer').classList.add('hidden');
+            
+            // Đưa bản đồ về lại vị trí người dùng
+            if (userLocation) {
+                map.setView([userLocation.lat, userLocation.lng], 14);
+            }
+        }
+    </script>
+</body>
+</html>

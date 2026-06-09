@@ -40,12 +40,153 @@
         .user-marker-fallback {
             background-color: #F97316; /* Màu cam nếu dùng vị trí mô phỏng */
         }
+
+        /* Responsive mobile sidebar overlay */
+        #mobile-toolbar {
+            display: none;
+        }
+
+        #sidebarPanel {
+            max-height: 85vh;
+        }
+
+        body.mobile-sidebar-open #sidebarPanel {
+            transform: translateY(0) !important;
+            box-shadow: 0 24px 80px rgba(15, 23, 42, 0.18);
+        }
+
+        @media (max-width: 767px) {
+            #mobile-toolbar {
+                display: flex;
+            }
+
+            #sidebarPanel {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                max-height: 85vh;
+                overflow-y: auto;
+                border-bottom-left-radius: 1rem;
+                border-bottom-right-radius: 1rem;
+                z-index: 30;
+                transform: translateY(-110%);
+            }
+
+            #sidebarPanel::before {
+                content: '';
+                position: fixed;
+                inset: 0;
+                background: rgba(15, 23, 42, 0.15);
+                z-index: -1;
+            }
+
+            main {
+                min-height: calc(100vh - 4rem);
+            }
+
+            #map,
+            #schema-view {
+                min-height: calc(100vh - 4rem);
+            }
+
+            .mobile-schema-layout {
+                align-items: stretch;
+                justify-content: flex-start;
+            }
+
+            .mobile-schema-layout {
+                touch-action: pan-x pan-y pinch-zoom;
+            }
+
+            .mobile-schema-layout .schema-inner {
+                width: 100%;
+                max-width: none;
+                padding: 1rem;
+                box-shadow: none;
+                border-radius: 1.25rem;
+                overflow: auto;
+                -webkit-overflow-scrolling: touch;
+                display: grid;
+                gap: 1rem;
+            }
+
+            .mobile-schema-layout .top-row {
+                display: grid;
+                grid-auto-flow: column;
+                grid-auto-columns: minmax(140px, 1fr);
+                gap: 0.75rem;
+                overflow-x: auto;
+                padding-bottom: 0.75rem;
+                scroll-snap-type: x mandatory;
+                align-items: start;
+            }
+
+            .mobile-schema-layout .top-row .room-item {
+                min-width: 140px;
+                scroll-snap-align: start;
+            }
+
+            .mobile-schema-layout .schema-section,
+            .mobile-schema-layout .schema-bottom {
+                display: flex;
+                flex-wrap: nowrap;
+                overflow-x: auto;
+                gap: 1rem;
+                padding-bottom: 0.75rem;
+                scroll-snap-type: x mandatory;
+                align-items: stretch;
+            }
+
+            .mobile-schema-layout .schema-section .building-block,
+            .mobile-schema-layout .schema-bottom .building-block,
+            .mobile-schema-layout .schema-section .market-area {
+                min-width: 260px;
+                flex: 0 0 auto;
+                scroll-snap-align: start;
+            }
+
+            .mobile-schema-layout .schema-section .market-area {
+                min-width: 220px;
+                padding: 1rem;
+                min-height: 220px;
+            }
+
+            .mobile-schema-layout .schema-bottom .building-block:first-child {
+                min-width: 320px;
+            }
+
+            .mobile-schema-layout .schema-inner .building-block {
+                width: 100%;
+            }
+
+            .mobile-schema-layout .schema-inner .room-item {
+                width: 100%;
+                min-width: 0;
+            }
+
+            body.mobile-sidebar-open {
+                overflow: hidden;
+            }
+        }
     </style>
 </head>
 <body class="bg-gray-50 h-screen overflow-hidden flex flex-col md:flex-row">
 
+    <!-- Mobile toolbar for quick access -->
+    <div id="mobile-toolbar" class="md:hidden fixed inset-x-0 top-0 z-30 flex items-center justify-between gap-2 bg-white/95 border-b border-gray-200 px-4 py-3 shadow-sm backdrop-blur-sm">
+        <button id="mobileSidebarToggle" onclick="toggleMobileSidebar()" class="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-100 px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-200">
+            <i class="ph ph-list"></i>
+            Điều khiển
+        </button>
+        <div class="flex items-center gap-2">
+            <button onclick="switchTab('map')" class="rounded-xl bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm">Bản đồ</button>
+            <button onclick="switchTab('schema')" class="rounded-xl bg-gray-100 px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-200">Sơ đồ</button>
+        </div>
+    </div>
+
     <!-- Sidebar / Bảng điều khiển -->
-    <aside class="w-full md:w-80 lg:w-96 bg-white shadow-lg z-10 flex flex-col h-auto md:h-full shrink-0">
+    <aside id="sidebarPanel" class="w-full md:w-80 lg:w-96 bg-white shadow-lg z-40 flex flex-col h-auto md:h-full shrink-0 md:relative absolute inset-x-0 top-0 transform -translate-y-full md:translate-y-0 transition-transform duration-300 md:shadow-none md:border-none md:translate-y-0">
         <!-- Header -->
         <div class="p-5 border-b border-gray-100 bg-blue-600 text-white md:rounded-none">
             <h1 class="text-xl font-bold flex items-center gap-2">
@@ -141,7 +282,7 @@
     </aside>
 
     <!-- Khu vực Hiển thị chính (Bản đồ / Sơ đồ phòng) -->
-    <main class="flex-1 bg-gray-200 relative overflow-hidden flex flex-col">
+    <main class="flex-1 bg-gray-200 relative overflow-hidden flex flex-col pt-16 md:pt-0 min-h-screen">
         
         <!-- BẢN ĐỒ -->
         <div id="map" class="h-full w-full bg-white shadow-inner">
@@ -149,15 +290,15 @@
         </div>
 
         <!-- SƠ ĐỒ PHÒNG (Mô phỏng ảnh chụp) -->
-        <div id="schema-view" class="hidden h-full w-full bg-gray-100 overflow-y-auto p-4 md:p-8 flex flex-col items-center ">
-            <h2 class="text-2xl font-black text-gray-800 mb-8 text-center drop-shadow-sm uppercase">Sơ đồ phòng thi vào lớp 10</h2>
+        <div id="schema-view" class="hidden h-full w-full bg-gray-100 overflow-y-auto overflow-x-hidden p-4 md:p-8 flex flex-col items-start">
+            <h2 class="text-2xl font-black text-gray-800 mb-8 text-center drop-shadow-sm uppercase w-full">Sơ đồ phòng thi vào lớp 10</h2>
             
-            <div class="relative w-full max-w-4xl bg-white p-4 md:p-8 rounded-2xl shadow-md border border-gray-200 flex flex-col gap-6">
+            <div class="schema-inner relative w-full max-w-full md:max-w-4xl bg-white p-4 md:p-8 rounded-2xl shadow-md border border-gray-200 flex flex-col gap-6">
                 
                 <!-- DÃY A3 -->
                 <div class="building-block w-full transition-all duration-300">
                     <h3 class="text-center font-bold text-gray-700 bg-gray-200 py-1.5 rounded-t border border-gray-300 tracking-wide">DÃY A3</h3>
-                    <div class="grid grid-cols-1 md:grid-cols-9 gap-3 p-4 border border-t-0 border-gray-300 rounded-b bg-gray-50">
+                    <div class="top-row grid grid-cols-1 md:grid-cols-9 gap-3 p-4 border border-t-0 border-gray-300 rounded-b bg-gray-50">
                         <div class="room-item bg-blue-50 text-blue-700 py-2 px-1 rounded flex flex-col items-center justify-center border border-blue-200 shadow-sm" data-floor="3"><span class="font-bold text-base leading-none">Cầu thang</span><span class="text-[10px] text-gray-500 mt-1 font-medium"></span></div>
                         <div class="room-item bg-blue-50 text-blue-700 py-2 px-1 rounded flex flex-col items-center justify-center border border-blue-200 shadow-sm" data-floor="3"><span class="font-bold text-lg leading-none">P01</span><span class="text-[10px] text-gray-500 mt-1 font-medium">Tầng 3</span></div>
                         <div class="room-item bg-blue-50 text-blue-700 py-2 px-1 rounded flex flex-col items-center justify-center border border-blue-200 shadow-sm" data-floor="3"><span class="font-bold text-lg leading-none">P02</span><span class="text-[10px] text-gray-500 mt-1 font-medium">Tầng 3</span></div>
@@ -191,13 +332,7 @@
                 </div>
 
                 <!-- Khu vực giữa (A2 - Sân - A4) -->
-                <div class="flex flex-col md:flex-row gap-6 w-full">
-                    <div class="child float-left-child building-block w-full md:w-1/3 transition-all duration-300">
-                        <h3 class="text-center font-bold text-gray-700 bg-gray-200 py-1.5 rounded-t border border-gray-300 tracking-wide">PHÒNG KHXH</h3>
-                        <div class="grid grid-cols-1 lg:grid-cols-1 gap-2 p-3 border border-t-0 border-gray-300 rounded-b bg-gray-50">
-                            <div class="room-item bg-blue-50 text-blue-700 py-2 px-1 rounded flex flex-col items-center justify-center border border-blue-200 shadow-sm" data-floor="1"><span class="font-bold text-base leading-none">P37</span><span class="text-[10px] text-gray-500 mt-1 font-medium">Tầng 1</span></div>
-                        </div>
-                    </div>                    
+                <div class="schema-section flex flex-col md:flex-row gap-6 w-full">               
                     <!-- DÃY A2 -->
                     <div class="child float-left-child building-block w-full md:w-1/3 transition-all duration-300">
                         <h3 class="text-center font-bold text-gray-700 bg-gray-200 py-1.5 rounded-t border border-gray-300 tracking-wide">DÃY A2</h3>
@@ -237,7 +372,7 @@
                     </div>
 
                     <!-- KHOẢNG SÂN -->
-                    <div class="hidden md:flex flex-1 items-center justify-center border-2 border-dashed border-gray-300 rounded-xl bg-gray-50/50">
+                    <div class="market-area flex-1 flex items-center justify-center border-2 border-dashed border-gray-300 rounded-xl bg-gray-50/50 min-h-[170px] md:min-h-auto">
                         <span class="text-gray-400 font-bold tracking-widest uppercase">Sân Trường</span>
                     </div>
 
@@ -285,7 +420,7 @@
                 </div>
 
                 <!-- Khu vực dưới cùng (A1 & Cổng) -->
-                <div class="flex flex-col md:flex-row gap-6 w-full">
+                <div class="schema-bottom flex flex-col md:flex-row gap-6 w-full">
                     <!-- DÃY A1 -->
                     <div class="building-block w-full md:flex-1 transition-all duration-300">
                         <h3 class="text-center font-bold text-gray-700 bg-gray-200 py-1.5 rounded-t border border-gray-300 tracking-wide">KHU HÀNH CHÍNH (A1)</h3>
@@ -347,6 +482,28 @@
                 schemaView.classList.remove('hidden');
                 mapControls.classList.add('hidden');
                 schemaControls.classList.remove('hidden');
+            }
+
+            if (window.innerWidth < 768) {
+                document.body.classList.remove('mobile-sidebar-open');
+                if (tab === 'schema') {
+                    schemaView.classList.add('mobile-schema-layout');
+                } else {
+                    schemaView.classList.remove('mobile-schema-layout');
+                }
+            } else {
+                schemaView.classList.remove('mobile-schema-layout');
+            }
+        };
+
+        window.toggleMobileSidebar = function() {
+            const body = document.body;
+            const button = document.getElementById('mobileSidebarToggle');
+            body.classList.toggle('mobile-sidebar-open');
+            if (body.classList.contains('mobile-sidebar-open')) {
+                button.innerHTML = `<i class="ph ph-x"></i> Đóng điều khiển`;
+            } else {
+                button.innerHTML = `<i class="ph ph-list"></i> Điều khiển`;
             }
         };
 
@@ -437,6 +594,13 @@
 
             // Tự động tải file KMZ từ repository khi tải trang
             autoLoadDefaultKMZ();
+            filterFloor('1'); // Mặc định hiển thị tầng 1
+
+            window.addEventListener('resize', () => {
+                if (window.innerWidth >= 768 && document.body.classList.contains('mobile-sidebar-open')) {
+                    document.body.classList.remove('mobile-sidebar-open');
+                }
+            });
         };
 
         // --- TỰ ĐỘNG TẢI FILE KMZ TỪ REPO ---
